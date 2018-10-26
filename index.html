@@ -9,89 +9,9 @@
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#D2AE6D">
-    <style>
-        html,
-        body {
-            width: 100%;
-            height: 100%;
-            padding: 0;
-            margin: 0;
-        }
 
-        body {
-            background: #3E3C5F url('star-back.svg');
-
-            background-size: 1200px;
-
-        }
-
-        .box {
-            position: relative;
-            height: 100%;
-            width: 100%;
-            line-height: 100vh;
-            text-align: center;
-
-        }
-
-        .box>.inner {
-            width: 100%;
-            max-width: 480px;
-            height: 330px;
-            box-sizing: border-box;
-            display: inline-block;
-            vertical-align: middle;
-
-        }
-
-        .box>.inner>.card {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.9);
-            height: 200px;
-            border-radius: 5px;
-            box-sizing: border-box;
-            border-left: 5px solid rgba(230, 230, 230, .9);
-            border-bottom: 5px solid rgba(230, 230, 230, .9);
-            box-shadow: 0px 5px 30px rgba(0, 0, 0, 0.3);
-            line-height: 30px;
-            padding: 30px 0;
-
-        }
-
-        .cssload-wrap {
-            text-align: center;
-            margin: 30px 0;
-        }
-
-        .box>.inner>.card>.loader-status {
-
-            vertical-align: middle;
-            text-align: center;
-            display: inline-block;
-            font-family: Tahoma;
-            font-size: 13px;
-            font-weight: 100;
-            direction: rtl;
-        }
-
-        .box>.inner>.logo {
-            height: 100px;
-            width: 100px;
-            display: block;
-            margin: 0 auto 30px auto;
-            box-shadow: -5px 5px 30px rgba(0, 0, 0, 0.3);
-            border-radius: 100%;
-            overflow: hidden;
-
-        }
-
-        .box>.inner>.logo>img {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-    </style>
     <link rel="stylesheet" href="loader.css" />
+    <link rel="stylesheet" href="style.css" />
 
 </head>
 
@@ -124,21 +44,35 @@
         </div>
 
     </div>
-
+    <script src="./lib/zip.js" type="text/javascript"> </script>
+    <script src="./lib/ArrayBufferReader.js" type="text/javascript"> </script>
+    <script src="./lib/deflate.js" type="text/javascript"> </script>
+    <script src="./lib/inflate.js" type="text/javascript"> </script>
     <script>
 
+        function rpd(input) {
+            if (!input) {
+                input = "";
+            }
+            const convert = a => {
+                return ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"][a];
+            };
+            return input.toString().replace(/\d/g, convert);
+        }
+        zip.useWebWorkers = false;
+        var cssLoader = document.querySelector('.cssload-wrap');
 
         var loader = function () {
 
-            var workerDone = () => {
+            // Opening a cache is an expensive operation. By caching the promise
+            // returned by `cache.open()` we only open the cache once.
+            var cachePromise;
+            function openCache() {
+                if (!cachePromise) { cachePromise = caches.open('cache-from-zip'); }
+                return cachePromise;
+            }
 
-                log('نصب با موفقیت انجام شد. ورود به سیستم ...');
-
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
-
-            };
+            // 
 
             var loaderStatusElem = document.querySelector('.loader-status');
 
@@ -151,29 +85,69 @@
 
             };
 
+            function startCaching() {
+                fetch('./versions.json?v=' + Math.random().toString().split('.')[1]).then(function (versionsResponse) {
+                    versionsResponse.json().then(function (versions) {
+                        console.info('pwa version to install: ' + versions[0]);
+                        fetch(versions[0] + '.zip?nocache=' + Math.random().toString().split('.')[1])
+                            .then(function (response) {
+                                return response.arrayBuffer();
+                            })
+                            .then(getZipReader)
+                            .then(function (zip) {
+                                cacheContents(zip).then(() => {
+                                    console.log('cached all files');
+                                    cssLoader.remove();
+                                    log('نرم افزار پیشرو شما حاضر است.');
+
+                                    setTimeout(() => {
+                                        location.href = '/';
+                                    }, 3000);
+
+                                })
+                            });
+                    });
+                });
+            }
+
             var start = async () => {
+
+                log('در حال نصب سیستم مدیریت مشتریان  بر روی مرورگر...');
+
+                if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+
+                } else {
+                    cssLoader.remove();
+                    return log('مرورگر شما سرویس ورکر را پشتیبانی نمیکند. یا آدرس وارد شده ناامن است.');
+                }
+
+
                 navigator.serviceWorker.getRegistration().then(function (registration) {
 
+                    console.log('navigator.serviceWorker.getRegistration', registration);
 
-                    if (registration && registration.active) {
-                        workerDone();
-                        //   registration.unregister();
-                        //  await caches.delete('cache-from-zip');
+                    if (registration && registration.active)
+                        console.log('serviceWorker register active');
 
-                    }
+
                 });
 
-                navigator.serviceWorker.oncontrollerchange = function () {
-                    if (navigator.serviceWorker.controller) {
+                // navigator.serviceWorker.oncontrollerchange = function () {
 
-                        workerDone();
-                    }
-                };
+                //     console.log('navigator.serviceWorker.oncontrollerchange');
+                //     if (navigator.serviceWorker.controller) {
 
+                //     }
+                // };
 
 
                 navigator.serviceWorker.register('worker.js').then(function () {
-                    log('در حال نصب سیستم مدیریت مشتریان  بر روی مرورگر...');
+
+                    log('نصب سرور ورکر با موفقیت انجام شد.  شروع دانلود اپ ...');
+
+                    startCaching();
+
+
                 }).catch(function (error) {
                     log('An error happened during installing the service worker:');
                     log(error.message);
@@ -181,9 +155,108 @@
 
 
             };
-            log('در حال نصب سیستم مدیریت مشتریان  بر روی مرورگر...');
 
-            return { start, workerDone };
+
+
+            // This wrapper promisifies the zip.js API for reading a zip.
+            function getZipReader(data) {
+                return new Promise(function (fulfill, reject) {
+                    zip.createReader(new zip.ArrayBufferReader(data), fulfill, reject);
+                });
+            }
+
+            var filesToInstallCount = 0;
+            var filesInstalled = 0;
+            // Use the reader to read each of the files inside the zip
+            // and put them into the offline cache.
+            function cacheContents(reader) {
+                return new Promise(function (fulfill, reject) {
+                    reader.getEntries(function (entries) {
+                        console.log(entries);
+                        filesToInstallCount = entries.filter((item) => {
+                            return !item.directory
+                        }).length;
+                        log('اپ دانلود شد. ' + rpd(filesToInstallCount) + ' فایل برای کش.')
+                        Promise.all(entries.map(cacheEntry)).then(fulfill, reject);
+                    });
+                });
+            }
+
+            // Cache one entry, skipping directories.
+            function cacheEntry(entry) {
+
+                if (entry.directory) { return Promise.resolve(); }
+
+                return new Promise(function (fulfill, reject) {
+                    // The writer specifies the format for the data to be read as.
+                    // This case, we want a generic blob as blob is one of the supported
+                    // formats for the `Response` constructor.
+                    entry.getData(new zip.BlobWriter(), function (data) {
+                        return openCache().then(function (cache) {
+                            var location = getLocation(entry.filename);
+                            var response = new Response(data, {
+                                headers: {
+                                    // As the zip says nothing about the nature of the file, we extract
+                                    // this information from the file name.
+                                    'Content-Type': getContentType(entry.filename)
+                                }
+                            });
+
+
+                            filesInstalled++;
+                            log('در حال کش کردن ' + rpd(filesInstalled + ' از ' + filesToInstallCount) + ' فایل');
+                            console.log('-> Caching', location, '(size:', entry.uncompressedSize, 'bytes)');
+
+                            // If the entry is the index, cache its contents for root as well.
+                            if (entry.filename == 'index.html') {
+                                // Response are one-use objects, as `.put()` consumes the data in the body
+                                // we need to clone the response in order to use it twice.
+                                cache.put(getLocation(), response.clone());
+                                cache.put(getOrigin(), response.clone());
+
+                            }
+                            return cache.put(location, response);
+                        }).then(fulfill, reject);
+                    });
+                });
+            }
+
+            // Return the location for each entry.
+
+            function getLocation(filename) {
+                return location.origin + '/' + (filename || '');
+            }
+
+            function getOrigin() {
+                return location.origin;
+            }
+
+            var contentTypesByExtension = {
+                'css': 'text/css',
+                'js': 'application/javascript',
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'svg': 'image/svg+xml',
+                'html': 'text/html',
+                'htm': 'text/html',
+                'json': 'application/json'
+            };
+
+            // Return the content type of a file based on the name extension
+            function getContentType(filename) {
+                var tokens = filename.split('.');
+                var extension = tokens[tokens.length - 1];
+                return contentTypesByExtension[extension] || 'text/plain';
+            }
+
+
+
+
+            return { start };
+
+
+
         }();
 
         loader.start();
