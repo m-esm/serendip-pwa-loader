@@ -86,49 +86,62 @@
             };
 
             function startCaching() {
+
                 fetch('./versions.json?v=' + Math.random().toString().split('.')[1]).then(function (versionsResponse) {
                     versionsResponse.json().then(function (versions) {
                         console.info('pwa version to install: ' + versions[0]);
+
+                        log('در حال دانلود ' + versions[0] + '<br> سیستم مدیریت ارتباط با مشتری سرندیپ ')
                         fetch(versions[0] + '.zip?nocache=' + Math.random().toString().split('.')[1])
-                            .then(function (response) {
-                                return response.arrayBuffer();
-                            })
-                            .then(getZipReader)
-                            .then(function (zip) {
-                                cacheContents(zip).then(() => {
-                                    console.log('cached all files');
+                            .then(async function (response) {
+
+                                var buff = await response.arrayBuffer();
+                                
+                                if (response.status == 404) {
                                     cssLoader.remove();
-                                    log('نرم افزار پیشرو شما حاضر است.');
+                                    return log('آپدیت  ' + versions[0] + ' هم اکنون در دسترس نیست.<br> لطفا دقایقی دیگر این صفحه را ریفرش کنید.')
+                                }
+                                getZipReader(buff)
+                                    .then(function (zip) {
+                                        cacheContents(zip).then(() => {
+                                            console.log('cached all files');
+                                            cssLoader.remove();
+                                            log('نرم افزار پیشرو شما حاضر است.');
 
-                                    setTimeout(() => {
-                                        location.href = '/';
-                                    }, 3000);
+                                            setTimeout(() => {
+                                                location.href = '/';
+                                            }, 3000);
 
-                                })
-                            });
+                                        }).catch((e) => {
+                                            log(e.message || e);
+                                        });
+                                    }).catch((e) => {
+                                        log(e.message || e);
+                                    });
+
+                            })
+
                     });
                 });
             }
 
             var start = async () => {
 
-                log('در حال نصب سیستم مدیریت مشتریان  بر روی مرورگر...');
-
                 if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
 
                 } else {
                     cssLoader.remove();
-                    return log('مرورگر شما سرویس ورکر را پشتیبانی نمیکند. یا آدرس وارد شده ناامن است.');
+                    return log('مرورگر شما سرویس ورکر را پشتیبانی نمیکند<br> یا آدرس وارد شده ناامن است.');
                 }
-
 
                 navigator.serviceWorker.getRegistration().then(function (registration) {
 
                     console.log('navigator.serviceWorker.getRegistration', registration);
 
-                    if (registration && registration.active)
+                    if (registration && registration.active) {
                         console.log('serviceWorker register active');
-
+                        registration.unregister();
+                    }
 
                 });
 
@@ -143,7 +156,7 @@
 
                 navigator.serviceWorker.register('worker.js').then(function () {
 
-                    log('نصب سرور ورکر با موفقیت انجام شد.  شروع دانلود اپ ...');
+                    log('نصب سرویس ورکر با موفقیت انجام شد.  شروع دانلود اپ ...');
 
                     startCaching();
 
@@ -172,7 +185,6 @@
             function cacheContents(reader) {
                 return new Promise(function (fulfill, reject) {
                     reader.getEntries(function (entries) {
-                        console.log(entries);
                         filesToInstallCount = entries.filter((item) => {
                             return !item.directory
                         }).length;

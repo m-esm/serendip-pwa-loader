@@ -26,17 +26,21 @@ self.onactivate = function (event) {
 // Answer by querying the cache. If fail, go to the network.
 self.onfetch = function (event) {
 
-  if (event.request.cache === 'only-if-cached' && event.request.mode !== 'same-origin') {
-    return;
-  }
+  if (event.request.url.indexOf('nocache') != -1)
+    return fetch(event.request);
+
+
   event.respondWith(openCache().then(function (cache) {
     return cache.match(event.request).then(function (response) {
+
+      console.log(event.request.url, event.request.url.indexOf('nocache'));
+
       return response || fetch(event.request);
     });
   }));
 };
 var cachePromise;
 function openCache() {
-    if (!cachePromise) { cachePromise = caches.open('cache-from-zip'); }
-    return cachePromise;
+  if (!cachePromise) { cachePromise = caches.open('cache-from-zip'); }
+  return cachePromise;
 }
